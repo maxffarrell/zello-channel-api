@@ -161,7 +161,9 @@ After successfully connecting to the channel and receiving [channel status](#on_
 
 ### `start_stream`
 
-Starts a new stream to the channel. The successful response includes `stream_id` which must be used in all data packets for this message as well as in `stop_stream` command.
+Starts a new stream to the channel or a user. The successful response includes `stream_id` which must be used in all data packets for this message as well as in `stop_stream` command.
+
+To send a 1:1 voice message, the client must be connected to at least one channel. Include `username` in the `start_stream` command and omit `channel`. The connected channel satisfies request validation, but the voice message is delivered only to the specified user.
 
 #### Attributes
 
@@ -169,7 +171,8 @@ Starts a new stream to the channel. The successful response includes `stream_id`
 |---|---|---
 | `command` | string | `start_stream `
 | `seq` | integer | Command sequence number
-| `channel` | string | The channel to send the message to
+| `channel` | string | The channel to send the message to. Omit when `username` is provided
+| `username` | string | Optional username to send a 1:1 voice message to. When provided, omit `channel`
 | `type` | string | Stream type. Only `audio` is currently supported
 | `codec` | string | The name of audio codec used. Required for `audio` streams. Must be `opus`.
 | `codec_header` | string | base64-encoded string, representing audio encoding parameters. Required for `audio` streams. See [below](#codec_header-attribute)
@@ -216,6 +219,20 @@ or
   "codec_header": "gD4BPA==",
   "packet_duration": 20,
   "for": "mrs.hudson"
+}
+```
+
+or, for a 1:1 voice message
+
+```json
+{
+  "command": "start_stream",
+  "seq": 2,
+  "username": "mrs.hudson",
+  "type": "audio",
+  "codec": "opus",
+  "codec_header": "gD4BPA==",
+  "packet_duration": 20
 }
 ```
 
