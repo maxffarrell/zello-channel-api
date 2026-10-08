@@ -155,6 +155,65 @@ A successful response includes `refresh_token` which can be used to quickly reco
 | `channels limit exceeded` | The list of channels supplied is longer than supported by the API. 
 
 
+## One-on-one voice messages (Zello Work)
+
+Zello Work supports sending and receiving direct one-on-one voice messages through the Channel API. Direct voice messages use the same Opus encoding, binary packets, and stream lifecycle as channel voice messages.
+
+### Sending a direct voice message
+
+1. Log on as a named Zello Work user and connect to **exactly one** authorized channel. The recipient must be an available user contact in the signed-in account's contact list; a username alone does not grant permission to contact another user.
+2. Wait for `on_channel_status` with `status: "online"` for that channel. The current API requires a connected channel even when the audio will be sent directly to a user.
+3. Send `start_stream` with `username` set to the recipient. **Omit `channel` and `for`** from this request. With one connected channel, the server uses that channel for readiness checks and routes the audio to the user contact.
+4. Use the returned `stream_id` to send [binary audio packets](#stream-data), then send `stop_stream` with that ID. Keep the channel connection open throughout the stream.
+
+For example, connect to `wss://zellowork.io/ws/YOUR_NETWORK_NAME` and log on:
+
+```json
+{
+  "command": "logon",
+  "seq": 1,
+  "username": "dispatcher1",
+  "password": "YOUR_PASSWORD",
+  "channels": ["Operations"]
+}
+```
+
+After the successful logon response and `on_channel_status` with `status: "online"` for `Operations`, start a direct stream:
+
+```json
+{
+  "command": "start_stream",
+  "seq": 2,
+  "username": "driver1",
+  "type": "audio",
+  "codec": "opus",
+  "codec_header": "gD4BPA==",
+  "packet_duration": 20
+}
+```
+
+The codec header and packet duration must match the audio you encode. After a successful response and the last audio packet, stop the stream:
+
+```json
+{
+  "command": "stop_stream",
+  "seq": 3,
+  "stream_id": 22695
+}
+```
+
+Replace `22695` with the stream ID returned by `start_stream`. Handle an error response before sending any audio. Omitting `channel` while connected to zero or multiple channels returns `not enough params`; sending before the connected channel is ready returns `channel is not ready`.
+
+### Receiving direct voice messages
+
+Incoming direct voice messages arrive through `on_stream_start`, binary audio packets, and `on_stream_stop`, as channel voice messages do. Use `from` to identify the sender and `stream_id` to associate audio packets with the stream. An incoming direct stream may have no `channel` value; do not discard it solely because it does not name one of your connected channels. `contactName` identifies the contact associated with the stream.
+
+### Direct messages and addressed channel messages
+
+`username` without `channel` selects a direct voice recipient. A request with `channel` and `for` sends a message through that channel to a particular member: other channel members do not receive it, but it remains a channel message. Supplying `channel` selects channel routing even if `username` is also present.
+
+The direct-message flow above covers Zello Work voice messages. The `for` attributes on `send_text_message`, `send_image`, and `send_location` describe addressed channel messages and do not establish direct user-to-user support for those commands. Dispatch-channel call management is a separate workflow from receiving a direct voice message.
+
 ## Streaming voice messages
 
 After successfully connecting to the channel and receiving [channel status](#on_channel_status) you can start sending voice messages. Each message is sent as stream, which begins with `start_stream` command followed by the sequence of binary packets with audio data and ends with `stop_stream` command. Zello uses [Opus](http://opus-codec.org/) voice codec to compress audio stream.
@@ -170,6 +229,7 @@ Starts a new stream to the channel. The successful response includes `stream_id`
 | `command` | string | `start_stream `
 | `seq` | integer | Command sequence number
 | `channel` | string | The channel to send the message to
+| `username` | string | (Zello Work direct voice only) Recipient contact username. Omit `channel` and connect to exactly one channel first. See [One-on-one voice messages](#one-on-one-voice-messages-zello-work).
 | `type` | string | Stream type. Only `audio` is currently supported
 | `codec` | string | The name of audio codec used. Required for `audio` streams. Must be `opus`.
 | `codec_header` | string | base64-encoded string, representing audio encoding parameters. Required for `audio` streams. See [below](#codec_header-attribute)
@@ -434,7 +494,8 @@ Indicates the start of the new incoming stream. This event corresponds to `start
 | `codec_header`          | string  | base64-encoded codec header buffer. Required for `opus` streams
 | `packet_duration`       | integer | Audio packet duration in milliseconds. Values between 2.5 ms and 60 ms are supported
 | `stream_id `            | integer | The id of the stream that started
-| `channel `              | string  | The name of the channel
+| `channel `              | string  | The name of the channel; may be absent for a direct Zello Work voice message
+| `contactName`           | string  | The contact associated with the incoming voice stream
 | `from `                 | string  | The username of the sender of the message
 | `for `                  | string  | The username of the recipient of the message if it was sent with `for` parameter 
 | `translations_enabled ` | boolean | (optional) Whether translations are enabled for this channel
@@ -639,6 +700,7 @@ Indicates incoming shared location from the channel.
 |Access channels using authorized user credentials | Supported              | Supported
 |Access channels anonymously in listen only mode | Supported              | Not supported
 |Send and receive voice messages | Supported              | Supported
+|Send and receive direct one-on-one voice messages | - | Supported with [single-channel setup](#one-on-one-voice-messages-zello-work)
 |Interoperability with Zello apps on Android, iOS, and PC | Supported              | Supported
 |Create and access ad hoc channels anonymously | Planned                | Planned
 |Send and receive images | Supported              | Supported

@@ -9,7 +9,7 @@ To get started check out these resources:
 
 * [Zello Channel SDKs](sdks) &mdash; plug and play open source SDKs for iOS, Android, and web browser
 * [Zello Channel API](API.md) &mdash; API specification to build your own client
+* [One-on-one voice messages on Zello Work](API.md#one-on-one-voice-messages-zello-work) &mdash; direct voice messaging setup and examples
 
 This API is currently in __beta__ and subject to change. If you encounter any issues please [submit an issue](https://github.com/zelloptt/zello-channel-api/issues) via Github.
-
 
